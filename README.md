@@ -272,7 +272,7 @@ npm start
 | 变量名 | 必需 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `ZHIPU_API_KEY` | ✅ | - | 智谱AI API密钥 |
-| `ZHIPU_FALLBACK_MODEL` | ❌ | `glm-4v` | 备用模型 |
+| `ZHIPU_FALLBACK_MODEL` | ❌ | `GLM-4V-Flash` | 备用模型 |
 | `API_BASE_URL` | ❌ | `https://open.bigmodel.cn/api/paas/v4` | API基础URL |
 | `API_TIMEOUT` | ❌ | `30000` | API超时时间(ms) |
 | `MAX_DAILY_REQUESTS` | ❌ | `1000` | 每日最大请求数 |

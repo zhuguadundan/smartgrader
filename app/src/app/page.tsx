@@ -17,7 +17,7 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<EssayAnalysisResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   
-  const { analysisState, isLoading, loadingMessage, stats } = useAppStore();
+  const { analysisState, isLoading, loadingMessage, stats, currentImageUrl } = useAppStore();
 
   const handleAnalysisComplete = (result: EssayAnalysisResult) => {
     setAnalysisResult(result);
@@ -137,12 +137,12 @@ export default function Home() {
                   <Card className='border-purple-200 bg-purple-50/50'>
                     <CardHeader className='pb-3'>
                       <CardTitle className='text-lg flex items-center gap-2'>
-                        📊 可视化报告
+                        📝 智能标注
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className='text-sm text-muted-foreground'>
-                        雷达图直观展示各项得分，配合详细建议，让改进方向一目了然
+                        在原作文图片上直接标注好词好句和改进建议，提供更直观的批改体验
                       </p>
                     </CardContent>
                   </Card>
@@ -153,6 +153,7 @@ export default function Home() {
               <EssayResultDisplay
                 result={analysisResult!}
                 onNewAnalysis={handleNewAnalysis}
+                imageUrl={currentImageUrl || undefined}
               />
             )}
           </div>

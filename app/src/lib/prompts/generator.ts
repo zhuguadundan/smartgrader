@@ -3,9 +3,15 @@
  * 提供动态生成定制化Prompt的功能
  */
 
-import { BASIC_ESSAY_PROMPT } from './basic';
-import { GRADE_SPECIFIC_PROMPTS } from './grade-specific';
+import { 
+  BASIC_ESSAY_PROMPT, 
+  GRADE_3_PROMPT, 
+  GRADE_4_PROMPT, 
+  GRADE_5_PROMPT, 
+  GRADE_6_PROMPT 
+} from './basic';
 import { GENRE_SPECIFIC_PROMPTS } from './genre-specific';
+import type { GradeLevel } from '@/types';
 
 /**
  * 根据参数生成定制化的Prompt
@@ -13,7 +19,7 @@ import { GENRE_SPECIFIC_PROMPTS } from './genre-specific';
  * @returns 生成的Prompt字符串
  */
 export function generateCustomPrompt(options: {
-  grade?: 3 | 4 | 5 | 6;
+  grade?: GradeLevel;
   genre?: 'narrative' | 'descriptive' | 'expository' | 'argumentative';
   focus?: string[];
   difficulty?: 'easy' | 'normal' | 'hard';
@@ -23,8 +29,21 @@ export function generateCustomPrompt(options: {
   let prompt = BASIC_ESSAY_PROMPT;
 
   // 根据年级调整
-  if (grade && GRADE_SPECIFIC_PROMPTS[`grade${grade}` as keyof typeof GRADE_SPECIFIC_PROMPTS]) {
-    prompt = GRADE_SPECIFIC_PROMPTS[`grade${grade}` as keyof typeof GRADE_SPECIFIC_PROMPTS];
+  if (grade) {
+    switch (grade) {
+      case 'grade-3':
+        prompt = GRADE_3_PROMPT;
+        break;
+      case 'grade-4':
+        prompt = GRADE_4_PROMPT;
+        break;
+      case 'grade-5':
+        prompt = GRADE_5_PROMPT;
+        break;
+      case 'grade-6':
+        prompt = GRADE_6_PROMPT;
+        break;
+    }
   }
 
   // 根据文体调整
@@ -45,4 +64,24 @@ export function generateCustomPrompt(options: {
   }
 
   return prompt;
+}
+
+/**
+ * 根据年级ID获取对应的Prompt
+ * @param grade - 年级ID
+ * @returns 对应的Prompt字符串
+ */
+export function getGradePrompt(grade: GradeLevel): string {
+  switch (grade) {
+    case 'grade-3':
+      return GRADE_3_PROMPT;
+    case 'grade-4':
+      return GRADE_4_PROMPT;
+    case 'grade-5':
+      return GRADE_5_PROMPT;
+    case 'grade-6':
+      return GRADE_6_PROMPT;
+    default:
+      return BASIC_ESSAY_PROMPT;
+  }
 }

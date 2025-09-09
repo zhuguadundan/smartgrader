@@ -4,7 +4,7 @@ import type { ZhipuAPIRequest, ZhipuAPIResponse } from '@/types';
 export const ZHIPU_CONFIG = {
   API_KEY: process.env.ZHIPU_API_KEY,
   BASE_URL: process.env.API_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4',
-  TIMEOUT: parseInt(process.env.API_TIMEOUT || '30000'),
+  TIMEOUT: parseInt(process.env.API_TIMEOUT || '120000'), // 120秒超时
   FALLBACK_MODEL: process.env.ZHIPU_FALLBACK_MODEL || 'glm-4v',
   PRIMARY_MODEL: 'glm-4.5v',
 };
@@ -107,7 +107,7 @@ export class ZhipuAPIService {
    */
   async callWithRetry(
     request: ZhipuAPIRequest,
-    maxRetries = 2
+    maxRetries = 3
   ): Promise<ZhipuAPIResponse> {
     let lastError: ZhipuAPIError | null = null;
 
@@ -124,24 +124,35 @@ export class ZhipuAPIService {
           throw lastError;
         }
         
+        // 如果是超时错误，增加重试机会和等待时间
+        if (lastError.status === 408) {
+          const waitTime = (attempt + 1) * 2000; // 2秒, 4秒, 6秒...
+          console.warn(`请求超时，${waitTime/1000}秒后重试 (尝试 ${attempt + 1}/${maxRetries + 1})`);
+          await this.delay(waitTime);
+          continue;
+        }
+        
         // 最后一次尝试失败后，不再重试
         if (attempt === maxRetries) {
           break;
         }
         
         // 等待一段时间后重试（指数退避）
-        await this.delay(Math.pow(2, attempt) * 1000);
+        await this.delay(Math.pow(2, attempt) * 1500);
       }
     }
 
-    // 如果主模型失败，尝试备用模型
-    if (lastError) {
+    // 如果主模型失败，尝试备用模型（对于超时错误特别有用）
+    if (lastError && (lastError.status === 408 || lastError.status === 500 || lastError.status === 502)) {
       console.warn('主模型调用失败，尝试备用模型:', lastError.message);
       
       try {
         return await this.callAPI(request, true);
       } catch (fallbackError) {
-        // 如果备用模型也失败，抛出原始错误
+        // 如果备用模型也失败，抛出友好的错误信息
+        if (lastError.status === 408) {
+          throw new ZhipuAPIError('AI分析时间较长，请稍后重试或尝试上传更清晰的图片', 408);
+        }
         throw lastError;
       }
     }
@@ -242,7 +253,7 @@ export class ZhipuAPIService {
    * @param errorData - 错误数据
    * @returns 用户友好的错误信息
    */
-  private getErrorMessage(status: number, errorData: any): string {
+  private getErrorMessage(status: number, errorData: Record<string, unknown>): string {
     switch (status) {
       case 400:
         return '请求参数错误';
@@ -259,7 +270,8 @@ export class ZhipuAPIService {
       case 504:
         return '服务暂时不可用，请稍后重试';
       default:
-        return errorData.error?.message || `API调用失败 (${status})`;
+        const error = errorData.error as { message?: string };
+        return error?.message || `API调用失败 (${status})`;
     }
   }
 

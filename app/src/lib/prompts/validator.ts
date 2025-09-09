@@ -39,21 +39,18 @@ export function validateEssayResult(content: string): ValidationResult {
     const result = JSON.parse(cleanContent);
     
     // 检查必需字段
-    const requiredFields = ['overall_score', 'dimensions', 'highlights', 'suggestions', 'overall_comment'];
+    const requiredFields = ['overall_score', 'overall_comment', 'highlights', 'suggestions'];
     for (const field of requiredFields) {
       if (!(field in result)) {
         return { isValid: false, error: `缺少必需字段: ${field}` };
       }
     }
 
-    // 检查dimensions字段
-    const requiredDimensions = ['handwriting', 'content', 'structure', 'language'];
-    for (const dim of requiredDimensions) {
-      if (!(dim in result.dimensions)) {
-        return { isValid: false, error: `缺少评分维度: ${dim}` };
-      }
-      if (!result.dimensions[dim].score || !result.dimensions[dim].comment) {
-        return { isValid: false, error: `维度 ${dim} 缺少score或comment字段` };
+    // 检查可选字段
+    const optionalFields = ['annotations'];
+    for (const field of optionalFields) {
+      if (field in result && !Array.isArray(result[field])) {
+        return { isValid: false, error: `字段 ${field} 必须是数组` };
       }
     }
 

@@ -8,7 +8,8 @@
       "Bash(npx shadcn:*)",
       "Bash(npm run dev)",
       "Bash(npm run lint)",
-      "Bash(git rm --cached app)"
+      "Bash(git rm --cached app)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

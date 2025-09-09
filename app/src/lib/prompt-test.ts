@@ -4,24 +4,25 @@
  */
 
 import { generateCustomPrompt, validateEssayResult, ENCOURAGING_PHRASES } from './prompts';
+import type { GradeLevel } from '@/types';
 
 // 测试用例数据
 export const TEST_CASES = {
   grade3_narrative: {
     description: '三年级记叙文 - 我的一天',
-    options: { grade: 3 as const, genre: 'narrative' as const },
+    options: { grade: 'grade-3' as GradeLevel, genre: 'narrative' as const },
     expectedScore: { min: 65, max: 85 },
     expectedFeatures: ['简单鼓励', '基础评价', '易懂建议']
   },
   grade5_descriptive: {
     description: '五年级写景作文 - 美丽的校园',
-    options: { grade: 5 as const, genre: 'descriptive' as const },
+    options: { grade: 'grade-5' as GradeLevel, genre: 'descriptive' as const },
     expectedScore: { min: 70, max: 95 },
     expectedFeatures: ['详细分析', '修辞评价', '深度建议']
   },
   grade6_argumentative: {
     description: '六年级议论文 - 读书的重要性',
-    options: { grade: 6 as const, genre: 'argumentative' as const, difficulty: 'hard' as const },
+    options: { grade: 'grade-6' as GradeLevel, genre: 'argumentative' as const, difficulty: 'hard' as const },
     expectedScore: { min: 75, max: 100 },
     expectedFeatures: ['逻辑分析', '论证评价', '高标准要求']
   }

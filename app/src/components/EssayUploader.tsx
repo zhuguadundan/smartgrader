@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { ImageUpload } from './ImageUpload';
+import { GradeSelection } from './GradeSelection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,12 +15,13 @@ import {
   Settings,
   Info,
   Wifi,
-  WifiOff
+  WifiOff,
+  BookOpen
 } from 'lucide-react';
 import { uploadFile, analyzeEssay, isOnline, waitForOnline, getErrorMessage } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/components/ui/toast';
-import type { UploadedFile, EssayAnalysisResult } from '@/types';
+import type { UploadedFile, EssayAnalysisResult, GradeLevel } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface EssayUploaderProps {
@@ -44,6 +46,9 @@ export function EssayUploader({
     analysisState,
     setAnalysisState,
     setAnalysisResult,
+    setCurrentImageUrl,
+    setSelectedGrade,
+    selectedGrade,
     setGlobalError,
     updateStats,
     resetState,
@@ -97,9 +102,35 @@ export function EssayUploader({
     resetState();
   }, [resetState]);
 
+  // 处理年级选择
+  const handleGradeSelect = useCallback((grade: GradeLevel) => {
+    setSelectedGrade(grade);
+    setAnalysisState({
+      status: 'idle',
+      progress: 0,
+      message: `已选择${grade === 'grade-3' ? '三年级' : grade === 'grade-4' ? '四年级' : grade === 'grade-5' ? '五年级' : '六年级'}，请上传作文图片`,
+    });
+    setGlobalError(null);
+    
+    // 显示选择提示
+    addToast({
+      type: 'success',
+      title: '年级选择成功',
+      description: `已选择${grade === 'grade-3' ? '三年级' : grade === 'grade-4' ? '四年级' : grade === 'grade-5' ? '五年级' : '六年级'}，系统将提供针对性的批改建议`,
+      duration: 3000,
+    });
+  }, [setSelectedGrade, setAnalysisState, setGlobalError, addToast]);
+
   // 开始分析
   const handleStartAnalysis = useCallback(async () => {
     if (!uploadedFile) return;
+
+    // 检查是否选择了年级
+    if (!selectedGrade) {
+      setGlobalError('请先选择学生的年级');
+      onError?.('请先选择学生的年级');
+      return;
+    }
 
     // 检查网络连接
     if (!networkStatus) {
@@ -152,8 +183,8 @@ export function EssayUploader({
         });
       }
 
-      // 调用分析API
-      const analysisResult = await analyzeEssay(uploadResult.data!.base64);
+      // 调用分析API，传入年级信息
+      const analysisResult = await analyzeEssay(uploadResult.data!.base64, { grade: selectedGrade });
 
       if (!analysisResult.success) {
         throw new Error(analysisResult.error || '分析失败');
@@ -173,6 +204,7 @@ export function EssayUploader({
       });
 
       setAnalysisResult(analysisResult.data!);
+      setCurrentImageUrl(uploadedFile!.preview);
       onAnalysisComplete(analysisResult.data!);
       
       // 显示成功提示
@@ -207,6 +239,7 @@ export function EssayUploader({
   }, [
     uploadedFile, 
     networkStatus, 
+    selectedGrade,
     onAnalysisStart, 
     onAnalysisComplete, 
     onError,
@@ -222,10 +255,10 @@ export function EssayUploader({
     setAnalysisState({
       status: 'idle',
       progress: 0,
-      message: uploadedFile ? '点击开始分析' : '',
+      message: uploadedFile && selectedGrade ? '点击开始分析' : '',
     });
     setGlobalError(null);
-  }, [uploadedFile, setAnalysisState, setGlobalError]);
+  }, [uploadedFile, selectedGrade, setAnalysisState, setGlobalError]);
 
   // 重试网络连接
   const handleRetryConnection = useCallback(async () => {
@@ -252,7 +285,7 @@ export function EssayUploader({
   }, [setAnalysisState, setGlobalError, handleRestart]);
 
   const isAnalyzing = analysisState.status === 'uploading' || analysisState.status === 'analyzing';
-  const canStartAnalysis = uploadedFile && analysisState.status === 'idle' && networkStatus;
+  const canStartAnalysis = uploadedFile && selectedGrade && analysisState.status === 'idle' && networkStatus;
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto space-y-6', className)}>
@@ -279,6 +312,12 @@ export function EssayUploader({
         </Card>
       )}
 
+      {/* 年级选择 */}
+      <GradeSelection
+        selectedGrade={selectedGrade}
+        onGradeSelect={handleGradeSelect}
+      />
+
       {/* 上传区域 */}
       <Card>
         <CardHeader>
@@ -296,7 +335,7 @@ export function EssayUploader({
           <ImageUpload
             onFileSelect={handleFileSelect}
             onFileRemove={handleFileRemove}
-            disabled={isAnalyzing || !networkStatus}
+            disabled={isAnalyzing || !networkStatus || !selectedGrade}
           />
         </CardContent>
       </Card>
@@ -310,13 +349,24 @@ export function EssayUploader({
                 <Settings className='h-5 w-5' />
                 分析设置
               </span>
-              <Badge variant='outline'>
-                {analysisState.status === 'idle' && '准备就绪'}
-                {analysisState.status === 'uploading' && '上传中'}
-                {analysisState.status === 'analyzing' && '分析中'}
-                {analysisState.status === 'completed' && '已完成'}
-                {analysisState.status === 'error' && '出错'}
-              </Badge>
+              <div className='flex items-center gap-2'>
+                {selectedGrade && (
+                  <Badge variant='secondary' className='text-xs'>
+                    <BookOpen className='h-3 w-3 mr-1' />
+                    {selectedGrade === 'grade-3' && '三年级'}
+                    {selectedGrade === 'grade-4' && '四年级'}
+                    {selectedGrade === 'grade-5' && '五年级'}
+                    {selectedGrade === 'grade-6' && '六年级'}
+                  </Badge>
+                )}
+                <Badge variant='outline'>
+                  {analysisState.status === 'idle' && '准备就绪'}
+                  {analysisState.status === 'uploading' && '上传中'}
+                  {analysisState.status === 'analyzing' && '分析中'}
+                  {analysisState.status === 'completed' && '已完成'}
+                  {analysisState.status === 'error' && '出错'}
+                </Badge>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className='space-y-4'>
@@ -358,7 +408,11 @@ export function EssayUploader({
                   className='flex-1'
                 >
                   <FileImage className='h-4 w-4 mr-2' />
-                  开始智能批改
+                  开始{selectedGrade === 'grade-3' && '三年级'}
+                  {selectedGrade === 'grade-4' && '四年级'}
+                  {selectedGrade === 'grade-5' && '五年级'}
+                  {selectedGrade === 'grade-6' && '六年级'}
+                  智能批改
                 </Button>
               )}
 

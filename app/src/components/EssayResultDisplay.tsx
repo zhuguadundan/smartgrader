@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RadarChartComponent } from './RadarChart';
+import { AnnotatedImageDisplay } from './AnnotatedImageDisplay';
 import { 
   Trophy, 
   Lightbulb, 
@@ -25,6 +25,7 @@ interface EssayResultDisplayProps {
   result: EssayAnalysisResult;
   onNewAnalysis?: () => void;
   className?: string;
+  imageUrl?: string;
 }
 
 // 获取分数等级和颜色
@@ -35,15 +36,7 @@ function getScoreLevel(score: number): { level: string; color: string; bgColor: 
   return { level: '待提高', color: 'text-red-700', bgColor: 'bg-red-100' };
 }
 
-// 维度名称映射
-const DIMENSION_NAMES = {
-  handwriting: '字迹工整度',
-  content: '内容丰富度',
-  structure: '结构清晰度',
-  language: '语言表达力',
-};
-
-export function EssayResultDisplay({ result, onNewAnalysis, className }: EssayResultDisplayProps) {
+export function EssayResultDisplay({ result, onNewAnalysis, className, imageUrl }: EssayResultDisplayProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const overallLevel = getScoreLevel(result.overall_score);
@@ -61,12 +54,18 @@ export function EssayResultDisplay({ result, onNewAnalysis, className }: EssayRe
 
   // 生成完整的评语文本
   const generateFullComment = () => {
-    const dimensionComments = Object.entries(result.dimensions)
-      .map(([key, dim]) => `${DIMENSION_NAMES[key as keyof typeof DIMENSION_NAMES]}：${dim.comment}`)
-      .join('\n\n');
+    const annotations = result.annotations && result.annotations.length > 0
+      ? `\n\n📝 详细标注：\n${result.annotations.map(a => {
+          if (a.type === 'praise') {
+            return `✨ ${a.text}（${a.reason}）`;
+          } else {
+            return `💡 ${a.id}. ${a.text} → 建议：${a.improved_text || '待补充'}（${a.reason}）`;
+          }
+        }).join('\n')}`
+      : '';
 
     const highlights = result.highlights.length > 0 
-      ? `\n\n✨ 亮点：\n${result.highlights.map(h => `• ${h}`).join('\n')}`
+      ? `\n\n🌟 亮点：\n${result.highlights.map(h => `• ${h}`).join('\n')}`
       : '';
 
     const suggestions = result.suggestions.length > 0
@@ -79,7 +78,7 @@ export function EssayResultDisplay({ result, onNewAnalysis, className }: EssayRe
 
 ${result.overall_comment}
 
-${dimensionComments}${highlights}${suggestions}
+${annotations}${highlights}${suggestions}
 
 ---
 本报告由智能作文批改助手生成`;
@@ -112,46 +111,14 @@ ${dimensionComments}${highlights}${suggestions}
         </CardContent>
       </Card>
 
-      {/* 雷达图 */}
-      <RadarChartComponent data={result} />
-
-      {/* 各维度详细评价 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Target className='h-5 w-5' />
-            详细评价
-          </CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          {Object.entries(result.dimensions).map(([key, dimension]) => {
-            const level = getScoreLevel(dimension.score);
-            return (
-              <div key={key} className='border rounded-lg p-4 space-y-3'>
-                <div className='flex items-center justify-between'>
-                  <h4 className='font-semibold text-gray-900'>
-                    {DIMENSION_NAMES[key as keyof typeof DIMENSION_NAMES]}
-                  </h4>
-                  <div className='flex items-center gap-2'>
-                    <span className='text-lg font-bold text-primary'>
-                      {dimension.score}分
-                    </span>
-                    <Badge 
-                      className={cn('text-xs', level.bgColor, level.color)}
-                      variant='secondary'
-                    >
-                      {level.level}
-                    </Badge>
-                  </div>
-                </div>
-                <p className='text-gray-700 leading-relaxed'>
-                  {dimension.comment}
-                </p>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      {/* 图片标注显示 */}
+      {imageUrl && (
+        <AnnotatedImageDisplay 
+          imageUrl={imageUrl}
+          annotations={result.annotations || []}
+          overallScore={result.overall_score}
+        />
+      )}
 
       {/* 总体评价 */}
       <Card>

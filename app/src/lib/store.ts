@@ -3,13 +3,15 @@
  */
 
 import { create } from 'zustand';
-import type { EssayAnalysisResult, AnalysisState } from '@/types';
+import type { EssayAnalysisResult, AnalysisState, GradeLevel } from '@/types';
 
 // 应用状态接口
 interface AppState {
   // 分析状态
   analysisState: AnalysisState;
   analysisResult: EssayAnalysisResult | null;
+  currentImageUrl: string | null;
+  selectedGrade: GradeLevel | null;
   
   // 错误状态
   globalError: string | null;
@@ -29,6 +31,8 @@ interface AppState {
   // Actions
   setAnalysisState: (state: Partial<AnalysisState>) => void;
   setAnalysisResult: (result: EssayAnalysisResult | null) => void;
+  setCurrentImageUrl: (url: string | null) => void;
+  setSelectedGrade: (grade: GradeLevel | null) => void;
   setGlobalError: (error: string | null) => void;
   setLoading: (loading: boolean, message?: string) => void;
   updateStats: (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => void;
@@ -44,6 +48,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     message: '',
   },
   analysisResult: null,
+  currentImageUrl: null,
+  selectedGrade: null,
   globalError: null,
   isLoading: false,
   loadingMessage: '',
@@ -62,6 +68,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setAnalysisResult: (result) =>
     set({ analysisResult: result }),
+
+  setCurrentImageUrl: (url) =>
+    set({ currentImageUrl: url }),
+
+  setSelectedGrade: (grade) =>
+    set({ selectedGrade: grade }),
 
   setGlobalError: (error) =>
     set({ globalError: error }),
@@ -88,6 +100,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         message: '',
       },
       analysisResult: null,
+      currentImageUrl: null,
+      selectedGrade: null,
       globalError: null,
       isLoading: false,
       loadingMessage: '',
@@ -192,7 +206,10 @@ export function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new AppError('请求超时', 'TIMEOUT')), timeoutMs)
+      setTimeout(() => reject(new AppError(
+        timeoutMs > 60000 ? 'AI分析时间较长，请耐心等待或尝试上传更清晰的图片' : '请求超时，请检查网络后重试', 
+        'TIMEOUT'
+      )), timeoutMs)
     ),
   ]);
 }

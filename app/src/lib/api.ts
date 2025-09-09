@@ -1,9 +1,9 @@
-import type { APIResponse, EssayAnalysisResult, UploadedFile } from '@/types';
+import type { APIResponse, EssayAnalysisResult, UploadedFile, GradeLevel } from '@/types';
 import { AppError, handleNetworkError, handleAPIError, withRetry, withTimeout } from './store';
 
 // API配置
 const API_CONFIG = {
-  timeout: 30000, // 30秒超时
+  timeout: 120000, // 120秒超时（图片分析需要更长时间）
   maxRetries: 2,
   retryDelay: 1000,
 };
@@ -99,7 +99,7 @@ export async function uploadFile(file: File): Promise<APIResponse<UploadedFile>>
 export async function analyzeEssay(
   imageBase64: string,
   options: {
-    grade?: 3 | 4 | 5 | 6;
+    grade?: GradeLevel;
     genre?: 'narrative' | 'descriptive' | 'expository' | 'argumentative';
     focus?: string[];
     difficulty?: 'easy' | 'normal' | 'hard';

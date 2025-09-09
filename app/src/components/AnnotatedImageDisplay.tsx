@@ -32,7 +32,6 @@ export function AnnotatedImageDisplay({
   const handleImageLoad = () => {
     if (imageRef.current) {
       const { naturalWidth, naturalHeight } = imageRef.current;
-      // 保存图片原始尺寸，虽然现在不直接使用，但可能后续需要
       setImageDimensions({ width: naturalWidth, height: naturalHeight });
       setImageLoaded(true);
     }
@@ -50,22 +49,38 @@ export function AnnotatedImageDisplay({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 清空画布
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 设置画布尺寸与图片显示尺寸一致
+    // 设置画布尺寸与图片显示尺寸一致（考虑设备像素比，避免模糊/错位）
     const rect = image.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    
-    // 确保画布位置与图片完全对齐
-    const containerRect = canvas.parentElement?.getBoundingClientRect();
-    if (containerRect) {
-      const imageLeft = rect.left - containerRect.left;
-      const imageTop = rect.top - containerRect.top;
-      canvas.style.left = `${imageLeft}px`;
-      canvas.style.top = `${imageTop}px`;
-    }
+    const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+
+    // 计算图片边框，确保画布与图片内容区域对齐（排除边框）
+    const styles = getComputedStyle(image);
+    const borderLeft = parseFloat(styles.borderLeftWidth) || 0;
+    const borderRight = parseFloat(styles.borderRightWidth) || 0;
+    const borderTop = parseFloat(styles.borderTopWidth) || 0;
+    const borderBottom = parseFloat(styles.borderBottomWidth) || 0;
+
+    const contentWidth = Math.max(0, rect.width - borderLeft - borderRight);
+    const contentHeight = Math.max(0, rect.height - borderTop - borderBottom);
+
+    // CSS 尺寸用于定位（与图片内容显示尺寸一致）
+    canvas.style.width = `${contentWidth}px`;
+    canvas.style.height = `${contentHeight}px`;
+    canvas.style.left = `${borderLeft}px`;
+    canvas.style.top = `${borderTop}px`;
+
+    // 画布实际像素尺寸（乘以 dpr）
+    const displayWidth = contentWidth;
+    const displayHeight = contentHeight;
+    canvas.width = Math.max(1, Math.round(displayWidth * dpr));
+    canvas.height = Math.max(1, Math.round(displayHeight * dpr));
+
+    // 重置并按 dpr 缩放，使后续坐标基于 CSS 像素绘制
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+
+    // 清空画布
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
 
     // 绘制分数标注（在右上角）
     if (overallScore !== undefined) {
@@ -77,7 +92,7 @@ export function AnnotatedImageDisplay({
       const textMetrics = ctx.measureText(scoreText);
       const textWidth = textMetrics.width;
       
-      const scoreX = canvas.width - textWidth - padding;
+      const scoreX = displayWidth - textWidth - padding;
       const scoreY = padding + fontSize;
       
       // 绘制红色分数文字
@@ -106,18 +121,24 @@ export function AnnotatedImageDisplay({
       if (!annotation.coordinates || !Array.isArray(annotation.coordinates) || annotation.coordinates.length !== 4) {
         return; // 跳过无效的标注
       }
-      const [x1, y1, x2, y2] = annotation.coordinates;
+      let [x1, y1, x2, y2] = annotation.coordinates;
+      // 兜底：确保坐标在 [0,1] 且 x1<=x2, y1<=y2
+      x1 = Math.max(0, Math.min(1, x1));
+      y1 = Math.max(0, Math.min(1, y1));
+      x2 = Math.max(0, Math.min(1, x2));
+      y2 = Math.max(0, Math.min(1, y2));
+      if (x1 > x2) [x1, x2] = [x2, x1];
+      if (y1 > y2) [y1, y2] = [y2, y1];
       
-      // 转换归一化坐标到画布坐标系
-      const canvasX1 = x1 * canvas.width;
-      const canvasY1 = y1 * canvas.height;
-      const canvasX2 = x2 * canvas.width;
-      const canvasY2 = y2 * canvas.height;
+      // 转换归一化坐标到画布（CSS 像素）坐标
+      const pxX1 = x1 * displayWidth;
+      const pxY1 = y1 * displayHeight;
+      const pxX2 = x2 * displayWidth;
+      const pxY2 = y2 * displayHeight;
       
-      // 调整划线位置到文字下方（稍微下移几个像素）
+      // 划线位置贴近文字底部（使用 y2 往上微调）
       const underlineOffset = annotation.type === 'praise' ? 3 : 5;
-      const adjustedY1 = canvasY1 + underlineOffset;
-      // const adjustedY2 = canvasY2 + underlineOffset;
+      const baseY = Math.max(0, Math.min(displayHeight, pxY2 - underlineOffset));
 
       ctx.lineWidth = 3;
       ctx.strokeStyle = annotation.type === 'praise' ? '#22c55e' : '#dc2626';
@@ -127,12 +148,11 @@ export function AnnotatedImageDisplay({
         // 绘制波浪线（好词好句）
         ctx.beginPath();
         const waveHeight = 4;
-        // const waveLength = 15;
-        const steps = Math.max(10, Math.ceil((canvasX2 - canvasX1) / 3));
+        const steps = Math.max(10, Math.ceil((pxX2 - pxX1) / 3));
         
         for (let i = 0; i <= steps; i++) {
-          const x = canvasX1 + (canvasX2 - canvasX1) * (i / steps);
-          const y = adjustedY1 + Math.sin((i / steps) * Math.PI * 4) * waveHeight;
+          const x = pxX1 + (pxX2 - pxX1) * (i / steps);
+          const y = baseY + Math.sin((i / steps) * Math.PI * 4) * waveHeight;
           if (i === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -141,17 +161,17 @@ export function AnnotatedImageDisplay({
         }
         ctx.stroke();
       } else {
-        // 绘制横线（需要改进的句子） - 使用双横线设计
+        // 绘制横线（需要改进的句子）- 使用双横线设置
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(canvasX1, adjustedY1);
-        ctx.lineTo(canvasX2, adjustedY1);
+        ctx.moveTo(pxX1, baseY);
+        ctx.lineTo(pxX2, baseY);
         ctx.stroke();
         
         // 绘制第二条横线（间隔3像素）
         ctx.beginPath();
-        ctx.moveTo(canvasX1, adjustedY1 + 5);
-        ctx.lineTo(canvasX2, adjustedY1 + 5);
+        ctx.moveTo(pxX1, baseY + 5);
+        ctx.lineTo(pxX2, baseY + 5);
         ctx.stroke();
 
         // 恢复线宽
@@ -165,15 +185,15 @@ export function AnnotatedImageDisplay({
         ctx.fillStyle = '#dc2626';
         ctx.fillText(
           displayId, 
-          canvasX2 + 8, 
-          adjustedY1 + 2
+          pxX2 + 8, 
+          baseY + 2
         );
       }
 
       // 如果悬停在这个标注上，高亮显示
       if (hoveredAnnotation === annotation.id) {
         ctx.fillStyle = annotation.type === 'praise' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(220, 38, 38, 0.2)';
-        ctx.fillRect(canvasX1, canvasY1 - 8, canvasX2 - canvasX1, canvasY2 - canvasY1 + 16);
+        ctx.fillRect(pxX1, pxY1 - 8, pxX2 - pxX1, pxY2 - pxY1 + 16);
       }
     });
   };
@@ -223,7 +243,7 @@ export function AnnotatedImageDisplay({
       // 扩大检测区域，使其更容易悬停
       const expandedY1 = Math.max(0, y1 - 0.01);
       const expandedY2 = Math.min(1, y2 + 0.01);
-      return x >= x1 && x <= x2 && y >= expandedY1 && y <= expandedY2;
+      return x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && y >= Math.min(expandedY1, expandedY2) && y <= Math.max(expandedY1, expandedY2);
     });
 
     setHoveredAnnotation(hovered?.id || null);
@@ -283,7 +303,9 @@ export function AnnotatedImageDisplay({
               className="absolute pointer-events-none rounded-lg"
               style={{ 
                 display: showAnnotations ? 'block' : 'none',
-                position: 'absolute'
+                position: 'absolute',
+                top: 0,
+                left: 0
               }}
             />
           </div>
@@ -321,7 +343,7 @@ export function AnnotatedImageDisplay({
               <div className="space-y-2">
                 {annotations
                   .filter(a => a.type === 'improvement')
-                  .map(annotation => (
+                  .map((annotation, idx) => (
                     <div 
                       key={annotation.id}
                       className={cn(
@@ -333,7 +355,7 @@ export function AnnotatedImageDisplay({
                     >
                       <div className="flex items-start gap-2">
                         <Badge variant="destructive" className="text-xs">
-                          {annotation.id}
+                          {idx + 1}
                         </Badge>
                         <div className="flex-1">
                           <div className="text-sm font-medium text-red-800">

@@ -18,7 +18,8 @@ import {
   WifiOff,
   BookOpen
 } from 'lucide-react';
-import { uploadFile, analyzeEssay, isOnline, waitForOnline, getErrorMessage } from '@/lib/api';
+import { analyzeEssay, isOnline, waitForOnline, getErrorMessage } from '@/lib/api';
+import { renderImageToDataURL } from '@/lib/image';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/components/ui/toast';
 import type { UploadedFile, EssayAnalysisResult, GradeLevel } from '@/types';
@@ -149,11 +150,7 @@ export function EssayUploader({
         message: '正在处理图片...',
       });
 
-      const uploadResult = await uploadFile(uploadedFile.file);
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || '文件上传失败');
-      }
+      const processedDataUrl = await renderImageToDataURL(uploadedFile.file, { maxDimension: 2000, mimeType: 'image/jpeg', quality: 0.9 });
 
       // 第二步：开始分析
       setAnalysisState({
@@ -184,7 +181,7 @@ export function EssayUploader({
       }
 
       // 调用分析API，传入年级信息
-      const analysisResult = await analyzeEssay(uploadResult.data!.base64, { grade: selectedGrade });
+      const analysisResult = await analyzeEssay(processedDataUrl, { grade: selectedGrade });
 
       if (!analysisResult.success) {
         throw new Error(analysisResult.error || '分析失败');
@@ -204,7 +201,7 @@ export function EssayUploader({
       });
 
       setAnalysisResult(analysisResult.data!);
-      setCurrentImageUrl(uploadedFile!.preview);
+      setCurrentImageUrl(processedDataUrl);
       onAnalysisComplete(analysisResult.data!);
       
       // 显示成功提示

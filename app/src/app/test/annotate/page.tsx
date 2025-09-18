@@ -58,12 +58,13 @@ export default function AnnotateTestPage() {
         const [r, g, b, a] = data;
         const isRed = r > 180 && g < 90 && b < 90 && a > 0;
 
-        // 再取不应有描边的空白区域（应接近白色）
+        // 再取不应有描边的空白区域（对于覆盖层画布应为透明）
         const whiteY = Math.round(0.45 * rect.height * dpr);
         const white = ctx.getImageData(sampleX, whiteY, 1, 1).data;
-        const isWhite = white[0] > 230 && white[1] > 230 && white[2] > 230;
+        // 透明判定：alpha 为 0 即表示覆盖层无像素（底层是图片）
+        const isTransparent = white[3] === 0;
 
-        setCheckResult(isRed && isWhite ? '通过' : `失败(r:${r},g:${g},b:${b})`);
+        setCheckResult(isRed && isTransparent ? '通过' : `失败(r:${r},g:${g},b:${b},a:${a})`);
       } catch (e) {
         setCheckResult('采样失败');
       }

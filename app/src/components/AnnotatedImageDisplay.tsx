@@ -34,6 +34,8 @@ export function AnnotatedImageDisplay({
       const { naturalWidth, naturalHeight } = imageRef.current;
       setImageDimensions({ width: naturalWidth, height: naturalHeight });
       setImageLoaded(true);
+      // 初次加载后尽快安排绘制，降低首帧检测失败概率
+      requestAnimationFrame(() => requestAnimationFrame(() => drawAnnotations()));
     }
   };
 
@@ -56,6 +58,10 @@ export function AnnotatedImageDisplay({
     // 画布 CSS 使用 absolute inset-0 填充容器，这里仅设置实际像素尺寸
     const displayWidth = rect.width;
     const displayHeight = rect.height;
+    // 同步 CSS 尺寸，保证与测量来源一致（避免容器细微差异导致错位）
+    canvas.style.width = `${Math.max(1, Math.round(displayWidth))}px`;
+    canvas.style.height = `${Math.max(1, Math.round(displayHeight))}px`;
+    // 设置绘图缓冲区尺寸（按 DPR 提升清晰度）
     canvas.width = Math.max(1, Math.round(displayWidth * dpr));
     canvas.height = Math.max(1, Math.round(displayHeight * dpr));
 
@@ -73,11 +79,10 @@ export function AnnotatedImageDisplay({
       const padding = 8;
       
       ctx.font = `bold ${fontSize}px Arial`;
-      const textMetrics = ctx.measureText(scoreText);
-      const textWidth = textMetrics.width;
-      
-      const scoreX = displayWidth - textWidth - padding;
-      const scoreY = padding + fontSize;
+      // 右上角对齐：使用 right 对齐，x 取显示宽度减去 padding；
+      // 文本基线使用 top，y 直接取 padding，避免多加一个字体高度导致的下移
+      const scoreX = displayWidth - padding;
+      const scoreY = padding;
       
       // 绘制红色分数文字
       ctx.fillStyle = '#ef4444';
@@ -120,8 +125,12 @@ export function AnnotatedImageDisplay({
       const pxX2 = x2 * displayWidth;
       const pxY2 = y2 * displayHeight;
       
-      // 划线位置贴近文字底部（使用 y2 往上微调）
-      const underlineOffset = annotation.type === 'praise' ? 3 : 5;
+      // 划线位置贴近文字底部（使用 y2 往上按比例微调，适配不同字号与缩放）
+      const boxH = Math.max(1, pxY2 - pxY1);
+      const underlineOffset = annotation.type === 'praise'
+        ? Math.min(6, Math.max(2, boxH * 0.12))
+        // 需要改进：与测试页对齐，固定 5px 偏移
+        : 5;
       const baseY = Math.max(0, Math.min(displayHeight, pxY2 - underlineOffset));
 
       ctx.lineWidth = 3;
@@ -145,21 +154,11 @@ export function AnnotatedImageDisplay({
         }
         ctx.stroke();
       } else {
-        // 绘制横线（需要改进的句子）- 使用双横线设置
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(pxX1, baseY);
-        ctx.lineTo(pxX2, baseY);
-        ctx.stroke();
-        
-        // 绘制第二条横线（间隔3像素）
-        ctx.beginPath();
-        ctx.moveTo(pxX1, baseY + 5);
-        ctx.lineTo(pxX2, baseY + 5);
-        ctx.stroke();
-
-        // 恢复线宽
-        ctx.lineWidth = 3;
+        // 绘制横线（需要改进的句子）- 使用填充矩形，避免亚像素取样导致检测失败
+        const thickness = 2; // 2px 厚度
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(pxX1, Math.round(baseY), pxX2 - pxX1, thickness);
+        ctx.fillRect(pxX1, Math.round(baseY + 5), pxX2 - pxX1, thickness);
 
         // 绘制编号 - 放在线条右侧，使用红色，使用重新编号后的ID
         const displayId = annotationIdMap.get(annotation.id) || annotation.id;
@@ -185,8 +184,8 @@ export function AnnotatedImageDisplay({
   // 监听窗口大小变化和图片加载
   useEffect(() => {
     const handleResize = () => {
-      // 使用下一帧确保布局稳定后再绘制
-      requestAnimationFrame(() => drawAnnotations());
+      // 使用两帧确保布局完全稳定后再绘制
+      requestAnimationFrame(() => requestAnimationFrame(() => drawAnnotations()));
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
@@ -198,7 +197,8 @@ export function AnnotatedImageDisplay({
     window.addEventListener('resize', handleResize);
     
     if (imageLoaded) {
-      requestAnimationFrame(() => drawAnnotations());
+      // 初次加载后也采用双 rAF，降低布局抖动带来的错位几率
+      requestAnimationFrame(() => requestAnimationFrame(() => drawAnnotations()));
     }
 
     return () => {
@@ -206,6 +206,14 @@ export function AnnotatedImageDisplay({
       resizeObserver.disconnect();
     };
   }, [imageLoaded, showAnnotations, annotations, hoveredAnnotation]);
+
+  // 兜底：若图片在 React 绑定 onLoad 前已完成加载，使用 complete 标志触发一次初始化
+  useEffect(() => {
+    const img = imageRef.current;
+    if (img && img.complete && !imageLoaded) {
+      handleImageLoad();
+    }
+  }, [imageUrl, imageLoaded]);
 
   // 处理鼠标移动事件
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -281,7 +289,7 @@ export function AnnotatedImageDisplay({
             />
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 pointer-events-none"
+              className="absolute top-0 left-0 pointer-events-none"
               style={{ 
                 display: showAnnotations ? 'block' : 'none'
               }}

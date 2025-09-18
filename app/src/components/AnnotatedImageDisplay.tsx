@@ -46,7 +46,7 @@ export function AnnotatedImageDisplay({
       return;
     }
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true } as CanvasRenderingContext2DSettings);
     if (!ctx) return;
 
     // 设置画布尺寸与图片显示尺寸一致（考虑设备像素比，避免模糊/错位）

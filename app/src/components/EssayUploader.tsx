@@ -100,8 +100,19 @@ export function EssayUploader({
   // 处理文件移除
   const handleFileRemove = useCallback(() => {
     setUploadedFile(null);
-    resetState();
-  }, [resetState]);
+
+    // 仅重置与当前上传/分析相关的状态，保留年级选择，便于再次上传
+    setAnalysisState({
+      status: 'idle',
+      progress: 0,
+      message: '',
+      result: undefined,
+      error: undefined,
+    });
+    setAnalysisResult(null);
+    setCurrentImageUrl(null);
+    setGlobalError(null);
+  }, [setAnalysisState, setAnalysisResult, setCurrentImageUrl, setGlobalError]);
 
   // 处理年级选择
   const handleGradeSelect = useCallback((grade: GradeLevel) => {

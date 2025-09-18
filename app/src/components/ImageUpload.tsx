@@ -84,6 +84,13 @@ export function ImageUpload({
     if (state.preview) {
       URL.revokeObjectURL(state.preview);
     }
+
+    // 重置文件输入值，允许选择同一文件再次触发 onChange
+    if (fileInputRef.current) {
+      try {
+        fileInputRef.current.value = '';
+      } catch {}
+    }
     
     setState({
       isDragOver: false,
@@ -127,6 +134,10 @@ export function ImageUpload({
   // 点击上传
   const handleClick = useCallback(() => {
     if (!disabled && fileInputRef.current) {
+      // 清空 value，保证同一个文件也能触发 change
+      try {
+        fileInputRef.current.value = '';
+      } catch {}
       fileInputRef.current.click();
     }
   }, [disabled]);

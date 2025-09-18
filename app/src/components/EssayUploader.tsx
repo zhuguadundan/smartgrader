@@ -343,7 +343,7 @@ export function EssayUploader({
           <ImageUpload
             onFileSelect={handleFileSelect}
             onFileRemove={handleFileRemove}
-            disabled={isAnalyzing || !networkStatus || !selectedGrade}
+            disabled={isAnalyzing}
           />
         </CardContent>
       </Card>

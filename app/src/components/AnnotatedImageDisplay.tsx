@@ -53,25 +53,9 @@ export function AnnotatedImageDisplay({
     const rect = image.getBoundingClientRect();
     const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
 
-    // 计算图片边框，确保画布与图片内容区域对齐（排除边框）
-    const styles = getComputedStyle(image);
-    const borderLeft = parseFloat(styles.borderLeftWidth) || 0;
-    const borderRight = parseFloat(styles.borderRightWidth) || 0;
-    const borderTop = parseFloat(styles.borderTopWidth) || 0;
-    const borderBottom = parseFloat(styles.borderBottomWidth) || 0;
-
-    const contentWidth = Math.max(0, rect.width - borderLeft - borderRight);
-    const contentHeight = Math.max(0, rect.height - borderTop - borderBottom);
-
-    // CSS 尺寸用于定位（与图片内容显示尺寸一致）
-    canvas.style.width = `${contentWidth}px`;
-    canvas.style.height = `${contentHeight}px`;
-    canvas.style.left = `${borderLeft}px`;
-    canvas.style.top = `${borderTop}px`;
-
-    // 画布实际像素尺寸（乘以 dpr）
-    const displayWidth = contentWidth;
-    const displayHeight = contentHeight;
+    // 画布 CSS 使用 absolute inset-0 填充容器，这里仅设置实际像素尺寸
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
     canvas.width = Math.max(1, Math.round(displayWidth * dpr));
     canvas.height = Math.max(1, Math.round(displayHeight * dpr));
 
@@ -201,23 +185,20 @@ export function AnnotatedImageDisplay({
   // 监听窗口大小变化和图片加载
   useEffect(() => {
     const handleResize = () => {
-      // 延迟执行，确保DOM更新完成
-      setTimeout(() => {
-        drawAnnotations();
-      }, 100);
+      // 使用下一帧确保布局稳定后再绘制
+      requestAnimationFrame(() => drawAnnotations());
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
-    const container = canvasRef.current?.parentElement;
-    
-    if (container) {
-      resizeObserver.observe(container);
+
+    if (imageRef.current) {
+      resizeObserver.observe(imageRef.current);
     }
 
     window.addEventListener('resize', handleResize);
     
     if (imageLoaded) {
-      drawAnnotations();
+      requestAnimationFrame(() => drawAnnotations());
     }
 
     return () => {
@@ -287,7 +268,7 @@ export function AnnotatedImageDisplay({
           </div>
 
           <div 
-            className="relative inline-block"
+            className="relative inline-block rounded-lg border overflow-hidden"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setHoveredAnnotation(null)}
           >
@@ -295,17 +276,14 @@ export function AnnotatedImageDisplay({
               ref={imageRef}
               src={imageUrl}
               alt="作文图片"
-              className="max-w-full h-auto rounded-lg border"
+              className="block max-w-full h-auto"
               onLoad={handleImageLoad}
             />
             <canvas
               ref={canvasRef}
-              className="absolute pointer-events-none rounded-lg"
+              className="absolute inset-0 pointer-events-none"
               style={{ 
-                display: showAnnotations ? 'block' : 'none',
-                position: 'absolute',
-                top: 0,
-                left: 0
+                display: showAnnotations ? 'block' : 'none'
               }}
             />
           </div>
